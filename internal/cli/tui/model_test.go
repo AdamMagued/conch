@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/njdaniel/conch/internal/cli"
 	"github.com/njdaniel/conch/pkg/schema"
@@ -1871,8 +1872,10 @@ func TestLongUserNameIsClippedInStatusLine(t *testing.T) {
 		t.Fatalf("view has %d lines, want 24:\n%s", len(lines), m.View())
 	}
 	statusLine := lines[len(lines)-1]
-	if utf8.RuneCountInString(statusLine) > 80 {
-		t.Errorf("status line is %d runes, want at most 80: %q", utf8.RuneCountInString(statusLine), statusLine)
+	// lipgloss.Width, not RuneCountInString: when styling is on the line
+	// carries escape sequences that are not cells.
+	if lipgloss.Width(statusLine) > 80 {
+		t.Errorf("status line is %d cells, want at most 80: %q", lipgloss.Width(statusLine), statusLine)
 	}
 }
 
@@ -1965,6 +1968,27 @@ func TestMultilineBodyCountsItsLines(t *testing.T) {
 	m.width, m.height = 80, 24
 	if lines := strings.Split(m.View(), "\n"); len(lines) != 24 {
 		t.Errorf("view has %d lines, want 24 (multiline body overflowed the pane):\n%s", len(lines), m.View())
+	}
+}
+
+// An escalated approval keeps its title in the inbox list: the [ESC] badge's
+// width is measured before styling, so its escape sequences cannot eat the
+// title's room and clip it to nothing.
+func TestEscalatedApprovalKeepsItsTitle(t *testing.T) {
+	app := schema.ApprovalV1{
+		ID: 1, RequesterID: 42, Title: "deploy friday",
+		Deadline:  schema.NewTimestamp(time.Now().Add(time.Hour)),
+		CreatedAt: schema.NewTimestamp(time.Now()),
+		Quorum:    1,
+		State:     schema.ApprovalStateEscalated,
+	}
+	m := NewModel(context.Background(), stubAPI{}, 42, []string{"general"})
+	m.mode = modeInbox
+	m.approvals = []schema.ApprovalV1{app}
+	m.width, m.height = 80, 24
+	v := m.View()
+	if !strings.Contains(v, "42: d") || !strings.Contains(v, "[ESC]") {
+		t.Errorf("escalated approval lost its title or badge:\n%s", v)
 	}
 }
 

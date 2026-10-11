@@ -773,10 +773,14 @@ func (m Model) View() string {
 				prefix = activeStyle.Render("› ")
 			}
 			esc := ""
+			escWidth := 0
 			if app.State == schema.ApprovalStateEscalated {
+				// Measure before styling: the rendered badge carries escape
+				// sequences that are not cells.
+				escWidth = utf8.RuneCountInString(" [ESC]")
 				esc = badgeStyle.Render(" [ESC]")
 			}
-			title := clip(fmt.Sprintf("%d: %s", app.RequesterID, sanitize(app.Title)), leftWidth-4-utf8.RuneCountInString(esc))
+			title := clip(fmt.Sprintf("%d: %s", app.RequesterID, sanitize(app.Title)), leftWidth-4-escWidth)
 			inboxLines = append(inboxLines, prefix+title+esc)
 		}
 		if len(inboxLines) == 0 {
