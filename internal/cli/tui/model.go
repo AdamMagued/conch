@@ -874,11 +874,15 @@ func (m Model) View() string {
 
 	status := m.status() + statusKeys
 	if name := sanitize(m.userName); name != "" {
-		status = name + " | " + status
+		// The name gets the room the status and key hints leave; when they
+		// already fill the line the name goes, never the hints. lipgloss's
+		// Width only pads, so without this clip a long name wraps and breaks
+		// the layout.
+		if room := width - utf8.RuneCountInString(status) - 3; room > 0 {
+			status = clip(name, room) + " | " + status
+		}
 	}
-	// Clip before styling: a name or status longer than the terminal would
-	// wrap and break the layout, and Width only pads, it does not truncate.
-	status = statusStyle.Width(width).Render(clip(status, width))
+	status = statusStyle.Width(width).Render(status)
 	return panes + "\n" + voice + inputStr + "\n" + status
 }
 
